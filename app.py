@@ -529,7 +529,7 @@ with tab_create:
     with g_col6:
         servings = st.slider("Servings", 1, 8, 2)
         
-    if st.button("🪄 Generate Gourmet AI Recipe", type="primary", use_container_width=True):
+    if st.button("Generate Recipe", type="primary", use_container_width=True):
         with st.spinner("KitchenIQ AI Chef crafting recipe with RAG vector context & safety checks..."):
             params = {
                 "ingredients": selected_ingredients,
