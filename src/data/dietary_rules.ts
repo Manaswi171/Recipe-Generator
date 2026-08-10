@@ -1,0 +1,85 @@
+export const STRICTLY_PROHIBITED_MEATS = [
+  'chicken',
+  'mutton',
+  'beef',
+  'pork',
+  'fish',
+  'seafood',
+  'prawn',
+  'prawns',
+  'shrimp',
+  'crab',
+  'meat',
+  'bacon',
+  'ham',
+  'sausage',
+  'lamb',
+  'turkey',
+  'duck',
+  'squid',
+  'octopus',
+  'anchovy',
+  'anchovies',
+  'tuna',
+  'salmon',
+  'lobster',
+  'clam',
+  'clams',
+  'oyster',
+  'oysters',
+  'mussel',
+  'mussels'
+];
+
+export const JAIN_PROHIBITED_INGREDIENTS = [
+  'onion',
+  'onions',
+  'garlic',
+  'shallot',
+  'shallots',
+  'potato',
+  'potatoes',
+  'carrot',
+  'carrots',
+  'radish',
+  'beetroot',
+  'turnip',
+  'ginger', // optional depending on sect, but commonly restricted
+  'sweet potato',
+  'yam',
+  'mushrooms',
+  'mushroom',
+  'yeast',
+  'alcohol',
+  'egg',
+  'eggs'
+];
+
+export const VEGAN_PROHIBITED_INGREDIENTS = [
+  'egg',
+  'eggs',
+  'milk',
+  'paneer',
+  'butter',
+  'ghee',
+  'cheese',
+  'yogurt',
+  'curd',
+  'cream',
+  'fresh cream',
+  'heavy cream',
+  'honey',
+  'condensed milk',
+  'parmesan',
+  'whey'
+];
+
+export const ALLERGY_INGREDIENT_MAP: Record<string, string[]> = {
+  Nuts: ['almond', 'cashew', 'walnut', 'pistachio', 'hazelnut', 'pecan', 'macadamia', 'nut', 'nuts'],
+  Peanuts: ['peanut', 'peanuts', 'peanut butter'],
+  Dairy: ['milk', 'paneer', 'butter', 'ghee', 'cheese', 'yogurt', 'curd', 'cream', 'fresh cream', 'heavy cream', 'parmesan', 'whey'],
+  Eggs: ['egg', 'eggs', 'egg white', 'egg yolk', 'mayonnaise'],
+  Gluten: ['wheat', 'flour', 'maida', 'fettuccine', 'bread', 'sourdough', 'pasta', 'noodles', 'soy sauce', 'barley', 'rye'],
+  Soy: ['soy', 'tofu', 'soy sauce', 'edamame', 'soy chunks'],
+  Sesame: ['sesame', 'tahini', 'sesame oil', 'til']
+};

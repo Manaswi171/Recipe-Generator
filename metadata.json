@@ -1,0 +1,10 @@
+{
+  "name": "KitchenIQ",
+  "description": "Intelligent vegetarian and egg-friendly kitchen companion for AI recipe generation, RAG discovery, fridge scanning, meal planning, and smart grocery lists.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
