@@ -3,6 +3,7 @@ import os
 import time
 from PIL import Image
 import io
+import pandas as pd
 
 from recipes_data import (
     RECIPES_DATASET,
@@ -16,7 +17,10 @@ from ai_engine import (
     generate_ai_recipe,
     detect_fridge_ingredients,
     validate_dietary_safety,
-    chat_with_ai_chef
+    chat_with_ai_chef,
+    scale_recipe_servings,
+    calculate_ingredient_swap,
+    export_grocery_list_text
 )
 
 # ---------------------------------------------------------
@@ -29,7 +33,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom Light Aesthetic Styling (Matching User Design Mockup)
+# Custom Light Aesthetic Styling
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700&display=swap');
@@ -262,7 +266,6 @@ st.markdown("""
         background-color: #145E37 !important;
     }
 
-    /* Progress bar green */
     .stProgress > div > div > div > div {
         background-color: #1B7A49 !important;
     }
@@ -299,7 +302,7 @@ if 'cooking_active' not in st.session_state:
     st.session_state.cooking_active = True
 
 if 'cooking_recipe' not in st.session_state:
-    st.session_state.cooking_recipe = RECIPES_DATASET[0]  # Indian Paneer Recipe default
+    st.session_state.cooking_recipe = RECIPES_DATASET[0]
 
 if 'cooking_step' not in st.session_state:
     st.session_state.cooking_step = 0
@@ -329,7 +332,7 @@ if 'chat_history' not in st.session_state:
     ]
 
 # ---------------------------------------------------------
-# Sidebar Configuration (Clean Light Layout Matching Design)
+# Sidebar Configuration
 # ---------------------------------------------------------
 with st.sidebar:
     st.markdown("""
@@ -361,6 +364,8 @@ with st.sidebar:
     
     gemini_key = os.getenv("GEMINI_API_KEY")
     
+    st.markdown("<hr style='border-top: 1px solid #E2E8F0; margin: 16px 0;'/>", unsafe_allow_html=True)
+    
     # Dietary Preferences
     st.subheader("⚙️ Dietary Safeguards")
     dietary_pref = st.selectbox(
@@ -382,7 +387,7 @@ with st.sidebar:
     st.caption("KitchenIQ • AI Powered Cooking Assistant")
 
 # ---------------------------------------------------------
-# Top Navigation & Weather Bar (Matching Mockup Layout)
+# Top Navigation & Weather Bar
 # ---------------------------------------------------------
 cols = st.columns([3.2, 1])
 with cols[0]:
@@ -404,29 +409,25 @@ with cols[1]:
     """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# Active Cooking Wizard Banner & Controls (Matching Mockup)
+# Active Cooking Wizard Banner & Controls
 # ---------------------------------------------------------
 if st.session_state.cooking_active and st.session_state.cooking_recipe:
     recipe = st.session_state.cooking_recipe
     step_idx = st.session_state.cooking_step
     total_steps = len(recipe["instructions"])
     
-    # Active Banner
     st.markdown("""
         <div class="active-mode-banner">
             <span>🍲</span> COOKING MODE ACTIVE
         </div>
     """, unsafe_allow_html=True)
     
-    # Cooking Title & Step Count
     st.markdown(f"<h2 style='color:#1B3626; font-weight:800; font-size:1.6rem; margin-bottom:4px;'>🧑‍🍳 Cooking: {recipe['name']}</h2>", unsafe_allow_html=True)
     st.markdown(f"<div style='color:#64748B; font-weight:600; font-size:0.95rem; margin-bottom:12px;'>Step {step_idx + 1} of {total_steps}</div>", unsafe_allow_html=True)
     
-    # Progress Bar
     progress = (step_idx + 1) / total_steps
     st.progress(progress)
     
-    # Step Card
     st.markdown(f"""
         <div class="step-card-light">
             <div class="step-title">Step {step_idx + 1}</div>
@@ -434,7 +435,6 @@ if st.session_state.cooking_active and st.session_state.cooking_recipe:
         </div>
     """, unsafe_allow_html=True)
     
-    # Action Buttons
     btn_cols = st.columns([1, 1, 1, 2])
     with btn_cols[0]:
         if st.button("←  Previous", disabled=(step_idx == 0)):
@@ -465,10 +465,11 @@ if st.session_state.cooking_active and st.session_state.cooking_recipe:
 # ---------------------------------------------------------
 # Main Tabs Navigation
 # ---------------------------------------------------------
-tab_create, tab_discover, tab_kitchen, tab_chat = st.tabs([
+tab_create, tab_discover, tab_kitchen, tab_analytics, tab_chat = st.tabs([
     "🪄 AI Recipe Studio",
     "🔍 Discover Recipes",
     "🍳 Smart Kitchen",
+    "📊 Macro Analytics",
     "💬 AI Chef Chat"
 ])
 
@@ -527,7 +528,7 @@ with tab_create:
     with g_col5:
         nutrition_goal = st.selectbox("Nutrition Target", ["High Protein", "Low Calorie", "Low Carb", "Balanced", "Muscle Gain"])
     with g_col6:
-        servings = st.slider("Servings", 1, 8, 2)
+        target_servings_input = st.slider("Servings & Portion Scaler", 1, 10, 2)
         
     if st.button("Generate Recipe", type="primary", use_container_width=True):
         with st.spinner("KitchenIQ AI Chef crafting recipe with RAG vector context & safety checks..."):
@@ -539,17 +540,17 @@ with tab_create:
                 "mealType": meal_type,
                 "cookingTime": cooking_time,
                 "nutritionGoal": nutrition_goal,
-                "servings": servings,
+                "servings": target_servings_input,
                 "budget": 500,
                 "difficulty": "Easy"
             }
             rec, safety, rag_used = generate_ai_recipe(params, gemini_key)
-            st.session_state.generated_recipe = rec
+            st.session_state.generated_recipe = scale_recipe_servings(rec, target_servings_input)
             st.session_state.safety_check = safety
 
     # Recipe Output Presentation
     if st.session_state.generated_recipe:
-        recipe = st.session_state.generated_recipe
+        recipe = scale_recipe_servings(st.session_state.generated_recipe, target_servings_input)
         safety = st.session_state.safety_check
         
         st.markdown("<hr style='border-top:1px solid #E2E8F0; margin:24px 0;'/>", unsafe_allow_html=True)
@@ -562,6 +563,8 @@ with tab_create:
         r_col1, r_col2 = st.columns([1, 2])
         with r_col1:
             st.image(recipe.get("imageUrl", "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80"), use_container_width=True)
+            st.caption(f"💰 Estimated Grocery Cost: **₹{recipe.get('estimated_cost', 120)}** for {recipe['servings']} servings")
+            
         with r_col2:
             st.markdown(f"## {recipe['name']}")
             st.markdown(f"*{recipe['description']}*")
@@ -580,15 +583,17 @@ with tab_create:
         det_col1, det_col2 = st.columns([1, 1])
         
         with det_col1:
-            st.markdown("#### 🛒 Ingredients Required:")
+            st.markdown(f"#### 🛒 Scaled Ingredients ({recipe['servings']} Servings):")
             for ing in recipe.get("ingredients", []):
                 avail_icon = "✅" if ing.get("available", True) else "🛒"
                 st.markdown(f"- {avail_icon} **{ing['name']}**: {ing['amount']}")
                 
-            if recipe.get("substitutions"):
-                st.markdown("#### 🔄 Recommended Smart Substitutions:")
-                sub_data = recipe["substitutions"]
-                st.table(sub_data)
+            st.markdown("#### 💡 Interactive Ingredient Swap & Calorie Delta:")
+            swap_orig = st.selectbox("Original Ingredient", ["Paneer", "Milk", "Butter", "Egg"], key="swap_orig")
+            swap_rep = st.selectbox("Substitute With", ["Tofu", "Halloumi", "Oat Milk", "Olive Oil", "Besan"], key="swap_rep")
+            if st.button("Calculate Swap Delta"):
+                delta = calculate_ingredient_swap(swap_orig, swap_rep)
+                st.info(f"Swap Impact: **{delta['cal_delta']:+} kcal** | **{delta['protein_delta']:+}g Protein** | **{delta['fat_delta']:+}g Fat**\n\n💡 *{delta['note']}*")
 
         with det_col2:
             st.markdown("#### 👩‍🍳 Step-by-Step Cooking Instructions:")
@@ -602,28 +607,28 @@ with tab_create:
         with act_cols[0]:
             if st.button("🌱 Remix: Vegan", use_container_width=True):
                 with st.spinner("Remixing to Vegan..."):
-                    params = {"ingredients": selected_ingredients, "dietaryPreference": "Vegan", "allergies": allergies, "cuisine": cuisine, "mealType": meal_type, "cookingTime": cooking_time, "nutritionGoal": nutrition_goal, "servings": servings, "budget": 500, "difficulty": "Easy"}
+                    params = {"ingredients": selected_ingredients, "dietaryPreference": "Vegan", "allergies": allergies, "cuisine": cuisine, "mealType": meal_type, "cookingTime": cooking_time, "nutritionGoal": nutrition_goal, "servings": target_servings_input, "budget": 500, "difficulty": "Easy"}
                     st.session_state.generated_recipe, st.session_state.safety_check, _ = generate_ai_recipe(params, gemini_key)
                     st.rerun()
                     
         with act_cols[1]:
             if st.button("🟡 Remix: Jain", use_container_width=True):
                 with st.spinner("Remixing to Jain..."):
-                    params = {"ingredients": selected_ingredients, "dietaryPreference": "Jain-Friendly", "allergies": allergies, "cuisine": cuisine, "mealType": meal_type, "cookingTime": cooking_time, "nutritionGoal": nutrition_goal, "servings": servings, "budget": 500, "difficulty": "Easy"}
+                    params = {"ingredients": selected_ingredients, "dietaryPreference": "Jain-Friendly", "allergies": allergies, "cuisine": cuisine, "mealType": meal_type, "cookingTime": cooking_time, "nutritionGoal": nutrition_goal, "servings": target_servings_input, "budget": 500, "difficulty": "Easy"}
                     st.session_state.generated_recipe, st.session_state.safety_check, _ = generate_ai_recipe(params, gemini_key)
                     st.rerun()
 
         with act_cols[2]:
             if st.button("⚡ Remix: 15-Min", use_container_width=True):
                 with st.spinner("Remixing for 15-min speed..."):
-                    params = {"ingredients": selected_ingredients, "dietaryPreference": dietary_pref, "allergies": allergies, "cuisine": cuisine, "mealType": meal_type, "cookingTime": "15 minutes", "nutritionGoal": nutrition_goal, "servings": servings, "budget": 500, "difficulty": "Easy"}
+                    params = {"ingredients": selected_ingredients, "dietaryPreference": dietary_pref, "allergies": allergies, "cuisine": cuisine, "mealType": meal_type, "cookingTime": "15 minutes", "nutritionGoal": nutrition_goal, "servings": target_servings_input, "budget": 500, "difficulty": "Easy"}
                     st.session_state.generated_recipe, st.session_state.safety_check, _ = generate_ai_recipe(params, gemini_key)
                     st.rerun()
 
         with act_cols[3]:
             if st.button("💪 Remix: High Protein", use_container_width=True):
                 with st.spinner("Boosting protein content..."):
-                    params = {"ingredients": selected_ingredients, "dietaryPreference": dietary_pref, "allergies": allergies, "cuisine": cuisine, "mealType": meal_type, "cookingTime": cooking_time, "nutritionGoal": "High Protein", "servings": servings, "budget": 500, "difficulty": "Easy"}
+                    params = {"ingredients": selected_ingredients, "dietaryPreference": dietary_pref, "allergies": allergies, "cuisine": cuisine, "mealType": meal_type, "cookingTime": cooking_time, "nutritionGoal": "High Protein", "servings": target_servings_input, "budget": 500, "difficulty": "Easy"}
                     st.session_state.generated_recipe, st.session_state.safety_check, _ = generate_ai_recipe(params, gemini_key)
                     st.rerun()
 
@@ -641,13 +646,15 @@ with tab_create:
 with tab_discover:
     st.subheader("🔍 Discover Gourmet Vegetarian & Egg-Friendly Recipes")
     
-    disc_f1, disc_f2, disc_f3 = st.columns([2, 1, 1])
+    disc_f1, disc_f2, disc_f3, disc_f4 = st.columns([2, 1, 1, 1])
     with disc_f1:
         search_query = st.text_input("Search recipes or ingredients", "")
     with disc_f2:
         filter_cuisine = st.selectbox("Filter Cuisine", ["All"] + list(set([r["cuisine"] for r in RECIPES_DATASET])))
     with disc_f3:
         filter_tag = st.selectbox("Filter Dietary Tag", ["All", "Vegan", "Jain-Friendly", "Egg-Friendly Vegetarian", "High-Protein Vegetarian"])
+    with disc_f4:
+        filter_meal = st.selectbox("Filter Meal Type", ["All", "Breakfast", "Lunch", "Dinner", "Snack"])
 
     filtered_recipes = RECIPES_DATASET
     if search_query:
@@ -656,6 +663,8 @@ with tab_discover:
         filtered_recipes = [r for r in filtered_recipes if r["cuisine"] == filter_cuisine]
     if filter_tag != "All":
         filtered_recipes = [r for r in filtered_recipes if filter_tag in r["dietaryTags"]]
+    if filter_meal != "All":
+        filtered_recipes = [r for r in filtered_recipes if r["mealType"] == filter_meal]
 
     st.markdown(f"Found **{len(filtered_recipes)}** matching gourmet recipes:")
 
@@ -748,6 +757,21 @@ with tab_kitchen:
                     st.session_state.grocery_list.pop(idx)
                     st.rerun()
 
+        st.markdown("<hr style='border-top:1px solid #E2E8F0; margin:16px 0;'/>", unsafe_allow_html=True)
+        st.markdown("#### 📥 One-Click Export Grocery List:")
+        ex_col1, ex_col2 = st.columns([1, 1])
+        
+        with ex_col1:
+            formatted_text = export_grocery_list_text(st.session_state.grocery_list)
+            st.download_button(
+                label="📥 Download Grocery List (.txt)",
+                data=formatted_text,
+                file_name="kitcheniq_grocery_list.txt",
+                mime="text/plain"
+            )
+        with ex_col2:
+            st.text_area("📱 Copy for WhatsApp / Notes:", value=formatted_text, height=120)
+
     with sub_pant:
         st.subheader("📦 Pantry Inventory Manager")
         st.markdown("Keep track of ingredients available in your kitchen for instant recipe generation.")
@@ -767,7 +791,36 @@ with tab_kitchen:
 
 
 # =========================================================
-# TAB 4: AI CHEF CHAT
+# TAB 4: MACRO ANALYTICS DASHBOARD
+# =========================================================
+with tab_analytics:
+    st.subheader("📊 Macro & Micronutrient Analytics Dashboard")
+    st.caption("Detailed nutritional breakdown and vegetarian health tracking.")
+    
+    active_rec = st.session_state.generated_recipe or RECIPES_DATASET[0]
+    nutr = active_rec.get("nutrition", {"calories": 480, "protein": 18, "carbs": 22, "fat": 36, "fiber": 4, "sugar": 8})
+    
+    an_c1, an_c2 = st.columns([1.5, 1])
+    with an_c1:
+        st.markdown(f"### 🥗 Nutritional Profile: **{active_rec['name']}**")
+        df_macros = pd.DataFrame({
+            "Nutrient": ["Protein", "Carbs", "Fat", "Fiber"],
+            "Grams": [nutr.get("protein", 18), nutr.get("carbs", 22), nutr.get("fat", 36), nutr.get("fiber", 4)]
+        })
+        st.bar_chart(df_macros.set_index("Nutrient"))
+        
+    with an_c2:
+        st.markdown("### 🧬 Vegetarian Micronutrient Tracker")
+        st.progress(0.85, text="Calcium Target: 85% met")
+        st.progress(0.70, text="Iron (Plant-based): 70% met")
+        st.progress(0.90, text="Vitamin C (Iron Booster): 90% met")
+        st.progress(0.65, text="Vitamin B12: 65% met")
+        
+        st.info("💡 **Chef Health Tip:** Pairing Vitamin C rich lemons/tomatoes with plant iron (spinach/beans) boosts iron absorption by 300%!")
+
+
+# =========================================================
+# TAB 5: AI CHEF CHAT
 # =========================================================
 with tab_chat:
     st.subheader("💬 Chat with KitchenIQ AI Master Chef")

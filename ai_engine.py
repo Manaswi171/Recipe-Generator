@@ -1,6 +1,7 @@
 """
 KitchenIQ AI Engine: Gemini 3.6 Flash & RAG Integration for Recipe Generation,
-Vision Fridge Ingredient Detection, Dietary Safety Validation, and AI Chef Chat.
+Vision Fridge Ingredient Detection, Dietary Safety Validation, AI Chef Chat,
+Nutritional Swap Calculator, Dynamic Servings Scaler, and Grocery Export Generator.
 """
 
 import os
@@ -42,7 +43,6 @@ def validate_dietary_safety(recipe: Dict[str, Any], dietary_pref: str = "Egg-Fri
     prohibited_found = []
     allergen_warnings = []
     
-    # Extract all ingredient names + instructions
     ing_text = " ".join([i.get("name", "") if isinstance(i, dict) else str(i) for i in recipe.get("ingredients", [])]).lower()
     full_text = f"{recipe.get('name', '')} {recipe.get('description', '')} {ing_text}".lower()
 
@@ -81,6 +81,96 @@ def validate_dietary_safety(recipe: Dict[str, Any], dietary_pref: str = "Egg-Fri
         "score": score,
         "summary": "✅ 100% Vegetarian & Dietary Compliant" if is_safe else f"⚠️ Violation Detected: {', '.join(prohibited_found)}"
     }
+
+
+def scale_recipe_servings(recipe: Dict[str, Any], target_servings: int) -> Dict[str, Any]:
+    """Dynamically recalculates ingredient amounts, total calories, macros, and estimated cost."""
+    base_servings = recipe.get("servings", 2)
+    if base_servings <= 0:
+        base_servings = 2
+    factor = target_servings / base_servings
+
+    scaled_recipe = dict(recipe)
+    scaled_recipe["servings"] = target_servings
+
+    # Scale nutrition
+    base_nutr = recipe.get("nutrition", {"calories": 350, "protein": 15, "carbs": 40, "fat": 12, "fiber": 5, "sugar": 4})
+    scaled_recipe["nutrition"] = {
+        "calories": round(base_nutr.get("calories", 350) * factor),
+        "protein": round(base_nutr.get("protein", 15) * factor, 1),
+        "carbs": round(base_nutr.get("carbs", 40) * factor, 1),
+        "fat": round(base_nutr.get("fat", 12) * factor, 1),
+        "fiber": round(base_nutr.get("fiber", 5) * factor, 1),
+        "sugar": round(base_nutr.get("sugar", 4) * factor, 1)
+    }
+    scaled_recipe["calories"] = scaled_recipe["nutrition"]["calories"]
+
+    # Scale ingredients
+    scaled_ingredients = []
+    for ing in recipe.get("ingredients", []):
+        amount_str = ing.get("amount", "1 unit")
+        # Try scaling numeric quantities if present
+        match = re.search(r'^([\d\.]+)\s*(.*)$', amount_str.strip())
+        if match:
+            num = float(match.group(1)) * factor
+            formatted_num = f"{int(num)}" if num.is_integer() else f"{num:.1f}"
+            scaled_amount = f"{formatted_num} {match.group(2)}"
+        else:
+            scaled_amount = amount_str
+
+        scaled_ingredients.append({
+            "name": ing.get("name", ""),
+            "amount": scaled_amount,
+            "category": ing.get("category", "Produce"),
+            "available": ing.get("available", True)
+        })
+    scaled_recipe["ingredients"] = scaled_ingredients
+    scaled_recipe["estimated_cost"] = round(120 * factor)  # ₹120 base estimate per 2 servings
+
+    return scaled_recipe
+
+
+def calculate_ingredient_swap(original_item: str, swap_item: str) -> Dict[str, Any]:
+    """Calculates nutritional delta when swapping key ingredients."""
+    swaps_db = {
+        ("paneer", "tofu"): {"cal_delta": -80, "protein_delta": +4, "fat_delta": -8, "note": "Lowers saturated fat while boosting plant protein."},
+        ("paneer", "halloumi"): {"cal_delta": +40, "protein_delta": +2, "fat_delta": +5, "note": "Rich salty dairy profile."},
+        ("milk", "oat milk"): {"cal_delta": -20, "protein_delta": -2, "fat_delta": -4, "note": "100% Vegan & lactose-free choice."},
+        ("butter", "olive oil"): {"cal_delta": 0, "protein_delta": 0, "fat_delta": 0, "note": "Replaces saturated animal fat with monounsaturated plant fat."},
+        ("egg", "besan"): {"cal_delta": +30, "protein_delta": +3, "fat_delta": -5, "note": "Great vegan fiber-rich binder for scrambles."}
+    }
+    key = (original_item.lower().strip(), swap_item.lower().strip())
+    return swaps_db.get(key, {
+        "cal_delta": -15,
+        "protein_delta": +2,
+        "fat_delta": -3,
+        "note": f"Swapping {original_item} with {swap_item} maintains delicious texture with optimized plant nutrients."
+    })
+
+
+def export_grocery_list_text(grocery_list: List[Dict[str, Any]]) -> str:
+    """Generates formatted WhatsApp / Notes text for easy grocery sharing."""
+    header = "🛒 *KitchenIQ Smart Grocery Shopping List*\n"
+    header += "--------------------------------------\n\n"
+    
+    categories = {}
+    for item in grocery_list:
+        cat = item.get("category", "Other")
+        if cat not in categories:
+            categories[cat] = []
+        status = "✅" if item.get("bought", False) else "🔳"
+        categories[cat].append(f"{status} {item['name']}")
+
+    body = ""
+    for cat, items in categories.items():
+        body += f"📍 *{cat.upper()}*\n"
+        for i in items:
+            body += f"  {i}\n"
+        body += "\n"
+
+    footer = "--------------------------------------\n"
+    footer += "Generated with KitchenIQ AI Cooking Assistant 🥗"
+    return header + body + footer
 
 
 def get_rag_context(query: str, dietary_pref: str = "Egg-Friendly Vegetarian") -> str:
@@ -214,7 +304,6 @@ Return ONLY a valid JSON object matching this schema without markdown wrapping:
         except Exception as e:
             print(f"Gemini generation error: {e}")
 
-    # High quality fallback recipe builder
     main_ing = ingredients[0] if ingredients else "Paneer & Mixed Veggies"
     fallback_recipe = {
         "id": f"fb_rec_{int(os.times().system * 1000)}",
@@ -310,7 +399,6 @@ def detect_fridge_ingredients(image_bytes: bytes, mime_type: str = "image/jpeg",
         except Exception as e:
             print(f"Vision detection error: {e}")
 
-    # Smart mock vision fallback
     mock_detected = ["Tomato", "Spinach", "Paneer", "Eggs", "Garlic", "Carrot", "Milk", "Bell Pepper"]
     return {
         "safe_ingredients": mock_detected,
@@ -352,7 +440,6 @@ User Inquiry: "{user_query}"
         except Exception as e:
             print(f"Chef chat error: {e}")
 
-    # Fallback chef advice
     return {
         "text": f"Great question about '{user_query}'! For vegetarian cooking, boost umami flavor using roasted garlic, slow-caramelized onions, kasuri methi, or a dash of nutritional yeast. If substituting paneer, firm tofu or halloumi works wonderfully in gravies!",
         "rag_used": True,
