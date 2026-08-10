@@ -132,7 +132,7 @@ RECIPES_DATASET = [
         "nutrition": {"calories": 360, "protein": 21, "carbs": 14, "fat": 26, "fiber": 6, "sugar": 3},
         "vegetarian": True,
         "eggAllowed": True,
-        "imageUrl": "https://images.unsplash.com/photo-1610057099443-f27361dd9914?auto=format&fit=crop&w=800&q=80"
+        "imageUrl": "https://images.unsplash.com/photo-1617692855027-33b14f061079?auto=format&fit=crop&w=800&q=80"
     },
     {
         "id": "rec_3",
@@ -341,7 +341,7 @@ RECIPES_DATASET = [
         "nutrition": {"calories": 460, "protein": 14, "carbs": 52, "fat": 22, "fiber": 4, "sugar": 3},
         "vegetarian": True,
         "eggAllowed": True,
-        "imageUrl": "https://images.unsplash.com/photo-1621996346565-e3def6164286?auto=format&fit=crop&w=800&q=80"
+        "imageUrl": "https://images.unsplash.com/photo-1551183053-bf91a1d81141?auto=format&fit=crop&w=800&q=80"
     },
     {
         "id": "rec_9",

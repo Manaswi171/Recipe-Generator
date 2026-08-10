@@ -86,7 +86,7 @@ export const RECIPES_DATASET: Recipe[] = [
     },
     vegetarian: true,
     eggAllowed: true,
-    imageUrl: 'https://images.unsplash.com/photo-1610057099443-f27361dd9914?auto=format&fit=crop&w=800&q=80'
+    imageUrl: 'https://images.unsplash.com/photo-1617692855027-33b14f061079?auto=format&fit=crop&w=800&q=80'
   },
   {
     id: 'rec_3',
@@ -337,7 +337,7 @@ export const RECIPES_DATASET: Recipe[] = [
     },
     vegetarian: true,
     eggAllowed: true,
-    imageUrl: 'https://images.unsplash.com/photo-1621996346565-e3def6164286?auto=format&fit=crop&w=800&q=80'
+    imageUrl: 'https://images.unsplash.com/photo-1551183053-bf91a1d81141?auto=format&fit=crop&w=800&q=80'
   },
   {
     id: 'rec_9',
