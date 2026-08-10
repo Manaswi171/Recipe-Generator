@@ -641,14 +641,15 @@ with tab_create:
 
 
 # =========================================================
-# TAB 2: DISCOVER RECIPES
+# TAB 2: DISCOVER RECIPES (GOOGLE-STYLE GLOBAL SEARCH)
 # =========================================================
 with tab_discover:
-    st.subheader("🔍 Discover Gourmet Vegetarian & Egg-Friendly Recipes")
+    st.subheader("🔍 Universal Recipe Search Engine")
+    st.caption("Search any dish, cuisine, or ingredient globally (e.g., 'Tacos', 'Ramen', 'Pasta', 'Smoothie', 'Dal Tadka', 'Kichdi', 'Burger').")
     
-    disc_f1, disc_f2, disc_f3, disc_f4 = st.columns([2, 1, 1, 1])
+    disc_f1, disc_f2, disc_f3, disc_f4 = st.columns([2.5, 1, 1, 1])
     with disc_f1:
-        search_query = st.text_input("Search recipes or ingredients", "")
+        search_query = st.text_input("🔍 Global Recipe Search", value="", placeholder="Type any dish name (e.g. Veg Tacos, Ramen, Lasagna, Gobi Manchurian)...")
     with disc_f2:
         filter_cuisine = st.selectbox("Filter Cuisine", ["All"] + list(set([r["cuisine"] for r in RECIPES_DATASET])))
     with disc_f3:
@@ -656,17 +657,62 @@ with tab_discover:
     with disc_f4:
         filter_meal = st.selectbox("Filter Meal Type", ["All", "Breakfast", "Lunch", "Dinner", "Snack"])
 
-    filtered_recipes = RECIPES_DATASET
+    filtered_recipes = list(RECIPES_DATASET)
+
+    # Dynamic Global Search Generator Trigger
     if search_query:
-        filtered_recipes = [r for r in filtered_recipes if search_query.lower() in r["name"].lower() or search_query.lower() in r["description"].lower()]
+        query_clean = search_query.strip()
+        filtered_recipes = [
+            r for r in filtered_recipes
+            if query_clean.lower() in r["name"].lower()
+            or query_clean.lower() in r["description"].lower()
+            or any(query_clean.lower() in ing["name"].lower() for ing in r["ingredients"])
+        ]
+
+        st.markdown(f"Found **{len(filtered_recipes)}** curated matches for '*'{search_query}'*':")
+        
+        # Google-style On-demand AI Search Bar Button
+        st.markdown("""
+            <div style="background:#EBF4EC; padding:14px 20px; border-radius:12px; border:1px solid rgba(27,122,73,0.15); margin-bottom:20px;">
+                <span style="font-weight:700; color:#1B5E38;">🌐 Want a custom recipe for something else?</span>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        if st.button(f"✨ Search Global AI Recipe Engine for '{search_query}'", type="primary", use_container_width=True):
+            with st.spinner(f"Searching global AI culinary database for '{search_query}'..."):
+                params = {
+                    "ingredients": [search_query],
+                    "dietaryPreference": dietary_pref,
+                    "allergies": allergies,
+                    "cuisine": filter_cuisine if filter_cuisine != "All" else "Indian",
+                    "mealType": filter_meal if filter_meal != "All" else "Lunch",
+                    "cookingTime": "30 minutes",
+                    "nutritionGoal": "Balanced",
+                    "servings": 2,
+                    "budget": 500,
+                    "difficulty": "Easy"
+                }
+                custom_rec, custom_safety, _ = generate_ai_recipe(params, gemini_key)
+                custom_rec["name"] = f"Gourmet {search_query.title()}"
+                
+                if "searched_recipes" not in st.session_state:
+                    st.session_state.searched_recipes = []
+                st.session_state.searched_recipes.insert(0, custom_rec)
+                st.success(f"Generated custom recipe for '{search_query}'!")
+                st.rerun()
+
+    # Append user searched custom recipes to display
+    if "searched_recipes" in st.session_state:
+        for s_rec in st.session_state.searched_recipes:
+            if s_rec not in filtered_recipes:
+                filtered_recipes.insert(0, s_rec)
+
     if filter_cuisine != "All":
         filtered_recipes = [r for r in filtered_recipes if r["cuisine"] == filter_cuisine]
     if filter_tag != "All":
         filtered_recipes = [r for r in filtered_recipes if filter_tag in r["dietaryTags"]]
     if filter_meal != "All":
         filtered_recipes = [r for r in filtered_recipes if r["mealType"] == filter_meal]
-
-    st.markdown(f"Found **{len(filtered_recipes)}** matching gourmet recipes:")
 
     cols_per_row = 3
     for i in range(0, len(filtered_recipes), cols_per_row):
