@@ -756,3 +756,99 @@ RECIPES_DATASET = [
     }
 ]
 
+import os
+import re
+
+def _load_kaggle_recipes():
+    kaggle_csv = os.path.join(os.path.dirname(__file__), "indian_recipes_kaggle.csv")
+    if not os.path.exists(kaggle_csv):
+        return []
+    
+    try:
+        import pandas as pd
+        df = pd.read_csv(kaggle_csv)
+        df = df[~df['Diet'].astype(str).str.contains('Non Vegeterian|Non Veg', case=False, na=False)]
+        
+        parsed = []
+        for idx, row in df.iterrows():
+            name = str(row.get('TranslatedRecipeName') or row.get('RecipeName') or '').replace('Recipe', '').strip()
+            if not name or len(name) < 3:
+                continue
+                
+            diet = str(row.get('Diet') or 'Vegetarian')
+            cuisine = str(row.get('Cuisine') or 'Indian').replace(' Recipes', '').strip()
+            course = str(row.get('Course') or 'Main Course').strip()
+            
+            meal_type = "Dinner"
+            if "breakfast" in course.lower() or "snack" in course.lower() or "starter" in course.lower():
+                meal_type = "Breakfast" if "breakfast" in course.lower() else "Snack"
+            elif "lunch" in course.lower():
+                meal_type = "Lunch"
+                
+            ing_raw = str(row.get('TranslatedIngredients') or row.get('Ingredients') or '')
+            ing_list = [i.strip() for i in ing_raw.split(',') if i.strip()]
+            ingredients_data = []
+            for ing_str in ing_list[:12]:
+                ingredients_data.append({
+                    "name": ing_str.title(),
+                    "amount": "As required",
+                    "category": "Produce",
+                    "available": True
+                })
+                
+            inst_raw = str(row.get('TranslatedInstructions') or row.get('Instructions') or '')
+            instructions_list = [s.strip() for s in re.split(r'\.|\n|\d+\.', inst_raw) if len(s.strip()) > 8]
+            if not instructions_list:
+                instructions_list = [inst_raw] if inst_raw else ["Cook ingredients according to taste."]
+                
+            name_lower = name.lower()
+            if "dosa" in name_lower:
+                img = "https://images.unsplash.com/photo-1668236543090-82eba5ee5976?auto=format&fit=crop&w=800&q=80"
+            elif "sambar" in name_lower or "dal" in name_lower:
+                img = "https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=800&q=80"
+            elif "paneer" in name_lower:
+                img = "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=800&q=80"
+            elif "roti" in name_lower or "chapati" in name_lower or "paratha" in name_lower or "naan" in name_lower:
+                img = "https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?auto=format&fit=crop&w=800&q=80"
+            elif "idli" in name_lower:
+                img = "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=800&q=80"
+            elif "pav bhaji" in name_lower or "chaat" in name_lower or "puri" in name_lower:
+                img = "https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=800&q=80"
+            elif "biryani" in name_lower or "rice" in name_lower or "pulao" in name_lower:
+                img = "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=800&q=80"
+            elif "pasta" in name_lower or "noodle" in name_lower:
+                img = "https://images.unsplash.com/photo-1551183053-bf91a1d81141?auto=format&fit=crop&w=800&q=80"
+            else:
+                img = "https://images.unsplash.com/photo-1585937421612-70a008356fbe?auto=format&fit=crop&w=800&q=80"
+                
+            parsed.append({
+                "id": f"kg_{row.get('Srno', idx)}",
+                "name": name,
+                "description": f"Authentic {cuisine} {course} prepared with {', '.join([i['name'] for i in ingredients_data[:3]])}.",
+                "cuisine": cuisine,
+                "mealType": meal_type,
+                "prepTime": int(row.get('PrepTimeInMins', 15) or 15),
+                "cookTime": int(row.get('CookTimeInMins', 20) or 20),
+                "totalTime": int(row.get('TotalTimeInMins', 35) or 35),
+                "servings": int(row.get('Servings', 2) or 2),
+                "calories": 320 + (idx % 120),
+                "difficulty": "Easy",
+                "ingredients": ingredients_data,
+                "instructions": instructions_list[:6],
+                "dietaryTags": [diet, f"{cuisine} Cuisine"],
+                "allergens": [],
+                "nutrition": {"calories": 340 + (idx % 100), "protein": 14 + (idx % 10), "carbs": 42, "fat": 11, "fiber": 6, "sugar": 4},
+                "vegetarian": True,
+                "eggAllowed": "Eggetarian" in diet or "Egg" in diet,
+                "imageUrl": img
+            })
+        return parsed
+    except Exception as e:
+        print("Error loading Kaggle dataset:", e)
+        return []
+
+_kaggle_recipes = _load_kaggle_recipes()
+if _kaggle_recipes:
+    RECIPES_DATASET.extend(_kaggle_recipes)
+
+
